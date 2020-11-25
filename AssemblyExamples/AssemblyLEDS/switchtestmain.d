@@ -1,0 +1,1 @@
+.\switchtestmain.o: SwitchTestMain.s
