@@ -8,6 +8,9 @@
 	IMPORT  Board_Init
 	IMPORT LED_Init
 	IMPORT  Board_Input
+	IMPORT   SysTick_Init
+    IMPORT   SysTick_Wait10ms
+	IMPORT   PLL_Init
 GPIO_PORTF_DIR_R   EQU 0x40025400
 GPIO_PORTF_AFSEL_R EQU 0x40025420
 GPIO_PORTF_DEN_R   EQU 0x4002551C
@@ -35,8 +38,9 @@ Start
 ;----------------------------------------------------------------
     BL  Board_Init                  ; initialize PF0 and PF4 and make them inputs
 	BL  LED_Init					; initialize PF1-PF3 and make them outputs 
+	BL  SysTick_Init   ; enable SysTick
     MOV R5, #RED                    ; R5 = RED (red LED on) the color of the LED register
-	MOV R2, #0 						; R2 = 0, R2 is the in charge of monitoring the mode
+	MOV R6, #0 						; R7 = 0, R7 is the in charge of monitoring the mode
 	STR R5,  [R4]
 ;Define array
 loop
@@ -49,20 +53,22 @@ loop
     STR R9, [R4]                    ; [R4] = R9 = (RED|GREEN|BLUE) (all LEDs on)
     B   loop
 sw1pressed1
-    ADD R2, R2, #0x01				;R2 = R2+1
-	AND R2, R2, #0x03				;R2 = R2&&3 = R2%4
-	CMP R2, #0x00
+    ADD R6, R6, #0x01				;R2 = R2+1
+	AND R6, R6, #0x03				;R2 = R2&&3 = R2%4
+	CMP R6, #0x00
 	BEQ mode1 
-	CMP R2, #0x01
+	CMP R6, #0x01
 	BEQ mode2
-	CMP R2, #0x02
+	CMP R6, #0x02
 	BEQ mode3
-	CMP R2, #0x03
+	CMP R6, #0x03
 	BEQ mode4
 sw1pressed2
 	BL delayMS
     B   loop
 nopressed 
+	BL  SysTick_Wait10ms
+	STR R5, [R4]
 	B loop
 mode1 ;mode 1 LED color red 
 	LSR R5, R5, #2     ;Shift right R5 by two (assume to be 0x08)
