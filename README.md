@@ -1,2 +1,2 @@
 # TivaAssemblyexamples
-ARM Assembly examples for the ttm4123gxl
+ARM Assembly examples for the tm4c123gxl
