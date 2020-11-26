@@ -1,0 +1,527 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000         
+    2 00000000         
+    3 00000000 40025400 
+                       GPIO_PORTF_DIR_R
+                               EQU              0x40025400
+    4 00000000 40025420 
+                       GPIO_PORTF_AFSEL_R
+                               EQU              0x40025420
+    5 00000000 40025510 
+                       GPIO_PORTF_PUR_R
+                               EQU              0x40025510
+    6 00000000 4002551C 
+                       GPIO_PORTF_DEN_R
+                               EQU              0x4002551C
+    7 00000000 40025520 
+                       GPIO_PORTF_LOCK_R
+                               EQU              0x40025520
+    8 00000000 40025524 
+                       GPIO_PORTF_CR_R
+                               EQU              0x40025524
+    9 00000000 40025528 
+                       GPIO_PORTF_AMSEL_R
+                               EQU              0x40025528
+   10 00000000 4002552C 
+                       GPIO_PORTF_PCTL_R
+                               EQU              0x4002552C
+   11 00000000 4C4F434B 
+                       GPIO_LOCK_KEY
+                               EQU              0x4C4F434B  ; Unlocks the GPIO_
+                                                            CR register
+   12 00000000 40025004 
+                       PF0     EQU              0x40025004
+   13 00000000 40025040 
+                       PF4     EQU              0x40025040
+   14 00000000 40025044 
+                       SWITCHES
+                               EQU              0x40025044
+   15 00000000 00000010 
+                       SW1     EQU              0x10        ; on the left side 
+                                                            of the Launchpad bo
+                                                            ard
+   16 00000000 00000001 
+                       SW2     EQU              0x01        ; on the right side
+                                                             of the Launchpad b
+                                                            oard
+   17 00000000         ;LED Colors 
+   18 00000000 00000002 
+                       RED     EQU              0x02
+   19 00000000 00000004 
+                       BLUE    EQU              0x04
+   20 00000000 00000008 
+                       GREEN   EQU              0x08
+   21 00000000 40025038 
+                       LEDS    EQU              0x40025038
+   22 00000000 400FE608 
+                       SYSCTL_RCGCGPIO_R
+                               EQU              0x400FE608
+   23 00000000 00000020 
+                       SYSCTL_RCGC2_GPIOF
+
+
+
+ARM Macro Assembler    Page 2 
+
+
+                               EQU              0x00000020  ; port F Clock Gati
+                                                            ng Control
+   24 00000000         
+   25 00000000                 AREA             |.text|, CODE, READONLY, ALIGN=
+2
+   26 00000000                 THUMB
+   27 00000000                 EXPORT           Board_Init
+   28 00000000                 EXPORT           LED_Init
+   29 00000000                 EXPORT           Board_Input
+   30 00000000         
+   31 00000000         ;------------Board_Init------------
+   32 00000000         ; Initialize GPIO Port F for negative logic switches on 
+                       PF0 and
+   33 00000000         ; PF4 as the Launchpad is wired.  Weak internal pull-up
+   34 00000000         ; resistors are enabled, and the NMI functionality on PF
+                       0 is
+   35 00000000         ; disabled.
+   36 00000000         ; Input: none
+   37 00000000         ; Output: none
+   38 00000000         ; Modifies: R0, R1
+   39 00000000         Board_Init
+   40 00000000         ; activate clock for Port F
+   41 00000000 4926            LDR              R1, =SYSCTL_RCGCGPIO_R ; R1 = &
+                                                            SYSCTL_RCGCGPIO_R
+   42 00000002 6808            LDR              R0, [R1]    ; R0 = [R1]
+   43 00000004 F040 0020       ORR              R0, R0, #SYSCTL_RCGC2_GPIOF ; R
+                                                            0 = R0|SYSCTL_RCGC2
+                                                            _GPIOF
+   44 00000008 6008            STR              R0, [R1]    ; [R1] = R0
+   45 0000000A BF00            NOP
+   46 0000000C BF00            NOP                          ; allow time to fin
+                                                            ish activating
+   47 0000000E         ; unlock the lock register
+   48 0000000E 4924            LDR              R1, =GPIO_PORTF_LOCK_R ; R1 = &
+                                                            GPIO_PORTF_LOCK_R
+   49 00000010 4824            LDR              R0, =GPIO_LOCK_KEY ; R0 = GPIO_
+                                                            LOCK_KEY (unlock GP
+                                                            IO Port F Commit Re
+                                                            gister)
+   50 00000012 6008            STR              R0, [R1]    ; [R1] = R0 = 0x4C4
+                                                            F434B
+   51 00000014         ; set commit register
+   52 00000014 4924            LDR              R1, =GPIO_PORTF_CR_R ; R1 = &GP
+                                                            IO_PORTF_CR_R
+   53 00000016 F04F 00FF       MOV              R0, #0xFF   ; R0 = 0x01 (enable
+                                                             commit for PF0)
+   54 0000001A 6008            STR              R0, [R1]    ; [R1] = R0 = 0x1
+   55 0000001C         ; set direction register
+   56 0000001C 4923            LDR              R1, =GPIO_PORTF_DIR_R ; R1 = &G
+                                                            PIO_PORTF_DIR_R
+   57 0000001E 6808            LDR              R0, [R1]    ; R0 = [R1]
+   58 00000020 F020 0011       BIC              R0, R0, #(SW1+SW2) ; R0 = R0&~(
+                                                            SW1|SW2) (make PF0 
+                                                            and PF4 input; PF0 
+                                                            and PF4 built-in bu
+                                                            ttons)
+   59 00000024 6008            STR              R0, [R1]    ; [R1] = R0
+   60 00000026         ; regular port function
+   61 00000026 4922            LDR              R1, =GPIO_PORTF_AFSEL_R ; R1 = 
+
+
+
+ARM Macro Assembler    Page 3 
+
+
+                                                            &GPIO_PORTF_AFSEL_R
+                                                            
+   62 00000028 6808            LDR              R0, [R1]    ; R0 = [R1]
+   63 0000002A F020 0011       BIC              R0, R0, #(SW1+SW2) ; R0 = R0&~(
+                                                            SW1|SW2) (disable a
+                                                            lt funct on PF0 and
+                                                             PF4)
+   64 0000002E 6008            STR              R0, [R1]    ; [R1] = R0
+   65 00000030         ; put a delay here if you are seeing erroneous NMI
+   66 00000030         ; enable pull-up resistors
+   67 00000030 4920            LDR              R1, =GPIO_PORTF_PUR_R ; R1 = &G
+                                                            PIO_PORTF_PUR_R
+   68 00000032 6808            LDR              R0, [R1]    ; R0 = [R1]
+   69 00000034 F040 0011       ORR              R0, R0, #(SW1+SW2) ; R0 = R0|(S
+                                                            W1|SW2) (enable wea
+                                                            k pull-up on PF0 an
+                                                            d PF4)
+   70 00000038 6008            STR              R0, [R1]    ; [R1] = R0
+   71 0000003A         ; enable digital port
+   72 0000003A 491F            LDR              R1, =GPIO_PORTF_DEN_R ; R1 = &G
+                                                            PIO_PORTF_DEN_R
+   73 0000003C 6808            LDR              R0, [R1]    ; R0 = [R1]
+   74 0000003E F040 0011       ORR              R0, R0, #(SW1+SW2) ; R0 = R0|(S
+                                                            W1|SW2) (enable dig
+                                                            ital I/O on PF0 and
+                                                             PF4)
+   75 00000042 6008            STR              R0, [R1]    ; [R1] = R0
+   76 00000044         ; configure as GPIO
+   77 00000044 491D            LDR              R1, =GPIO_PORTF_PCTL_R ; R1 = &
+                                                            GPIO_PORTF_PCTL_R
+   78 00000046 6808            LDR              R0, [R1]    ; R0 = [R1]
+   79 00000048 F020 100F       BIC              R0, R0, #0x000F000F ; R0 = R0&~
+                                                            0x000F000F (clear p
+                                                            ort control field f
+                                                            or PF0 and PF4)
+   80 0000004C F100 0000       ADD              R0, R0, #0x00000000 ; R0 = R0+0
+                                                            x00000000 (configur
+                                                            e PF0 and PF4 as GP
+                                                            IO)
+   81 00000050 6008            STR              R0, [R1]    ; [R1] = R0
+   82 00000052         ; disable analog functionality
+   83 00000052 491B            LDR              R1, =GPIO_PORTF_AMSEL_R ; R1 = 
+                                                            &GPIO_PORTF_AMSEL_R
+                                                            
+   84 00000054 F04F 0000       MOV              R0, #0      ; R0 = 0 (disable a
+                                                            nalog functionality
+                                                             on PF)
+   85 00000058 6008            STR              R0, [R1]    ; [R1] = R0
+   86 0000005A 4770            BX               LR          ; return
+   87 0000005C         LED_Init
+   88 0000005C         ; set direction register
+   89 0000005C 4913            LDR              R1, =GPIO_PORTF_DIR_R ; R1 = &G
+                                                            PIO_PORTF_DIR_R
+   90 0000005E 6808            LDR              R0, [R1]    ; R0 = [R1]
+   91 00000060 F040 000E       ORR              R0, R0, #(RED+BLUE+GREEN) ; R0 
+                                                            = R0|(RED|BLUE|GREE
+                                                            N) (make PF3-1 outp
+                                                            ut; PF3-1 built-in 
+                                                            LEDs)
+
+
+
+ARM Macro Assembler    Page 4 
+
+
+   92 00000064 6008            STR              R0, [R1]    ; [R1] = R0
+   93 00000066         ; regular port function
+   94 00000066 4912            LDR              R1, =GPIO_PORTF_AFSEL_R ; R1 = 
+                                                            &GPIO_PORTF_AFSEL_R
+                                                            
+   95 00000068 6808            LDR              R0, [R1]    ; R0 = [R1]
+   96 0000006A F020 000E       BIC              R0, R0, #(RED+BLUE+GREEN) ; R0 
+                                                            = R0&~(RED|BLUE|GRE
+                                                            EN) (disable alt fu
+                                                            nct on PF3-1)
+   97 0000006E 6008            STR              R0, [R1]    ; [R1] = R0
+   98 00000070         ; enable digital port
+   99 00000070 4911            LDR              R1, =GPIO_PORTF_DEN_R ; R1 = &G
+                                                            PIO_PORTF_DEN_R
+  100 00000072 6808            LDR              R0, [R1]    ; R0 = [R1]
+  101 00000074 F040 000E       ORR              R0, R0, #(RED+BLUE+GREEN) ; R0 
+                                                            = R0|(RED|BLUE|GREE
+                                                            N) (enable digital 
+                                                            I/O on PF3-1)
+  102 00000078 6008            STR              R0, [R1]    ; [R1] = R0
+  103 0000007A         ; configure as GPIO
+  104 0000007A 4910            LDR              R1, =GPIO_PORTF_PCTL_R ; R1 = &
+                                                            GPIO_PORTF_PCTL_R
+  105 0000007C 6808            LDR              R0, [R1]    ; R0 = [R1]
+  106 0000007E F420 407F       BIC              R0, R0, #0x0000FF00 ; R0 = R0&~
+                                                            0x0000FF00 (clear p
+                                                            ort control field f
+                                                            or PF3-2)
+  107 00000082 F020 00F0       BIC              R0, R0, #0x000000F0 ; R0 = R0&~
+                                                            0x000000F0 (clear p
+                                                            ort control field f
+                                                            or PF1)
+  108 00000086 6008            STR              R0, [R1]    ; [R1] = R0
+  109 00000088         ; disable analog functionality
+  110 00000088 490D            LDR              R1, =GPIO_PORTF_AMSEL_R ; R1 = 
+                                                            &GPIO_PORTF_AMSEL_R
+                                                            
+  111 0000008A F04F 0000       MOV              R0, #0      ; R0 = 0 (disable a
+                                                            nalog functionality
+                                                             on PF)
+  112 0000008E 6008            STR              R0, [R1]    ; [R1] = R0
+  113 00000090 4C0C            LDR              R4, =LEDS   ; R4 = &LEDS
+  114 00000092 4770            BX               LR          ; return
+  115 00000094         ;------------Board_Input------------
+  116 00000094         ; Read and return the status of the switches.
+  117 00000094         ; Input: none
+  118 00000094         ; Output: R0  0x01 if only Switch 1 is pressed
+  119 00000094         ;         R0  0x10 if only Switch 2 is pressed
+  120 00000094         ;         R0  0x00 if both switches are pressed
+  121 00000094         ;         R0  0x11 if no switches are pressed
+  122 00000094         ; Modifies: R1
+  123 00000094         Board_Input
+  124 00000094 490C            LDR              R1, =SWITCHES ; R1 = &SWITCHES 
+                                                            (pointer to locatio
+                                                            n of PF0 and PF4)
+  125 00000096 6808            LDR              R0, [R1]    ; R0 = [R1] (read P
+                                                            F0 and PF4)
+  126 00000098 4770            BX               LR          ; return
+  127 0000009A         
+
+
+
+ARM Macro Assembler    Page 5 
+
+
+  128 0000009A 00 00           ALIGN                        ; make sure the end
+                                                             of this section is
+                                                             aligned
+  129 0000009C                 END                          ; end of file
+              400FE608 
+              40025520 
+              4C4F434B 
+              40025524 
+              40025400 
+              40025420 
+              40025510 
+              4002551C 
+              4002552C 
+              40025528 
+              40025038 
+              40025044 
+Command Line: --debug --xref --cpu=Cortex-M4 --apcs=interwork --depend=.\init.d
+ -o.\init.o -IC:\Keil\ARM\RV31\INC -IC:\Keil\ARM\CMSIS\Include -IC:\Keil\ARM\In
+c\TI\TM4C123 --predefine="__EVAL SETA 1" --list=.\init.lst Init.s
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+.text 00000000
+
+Symbol: .text
+   Definitions
+      At line 25 in file Init.s
+   Uses
+      None
+Comment: .text unused
+Board_Init 00000000
+
+Symbol: Board_Init
+   Definitions
+      At line 39 in file Init.s
+   Uses
+      At line 27 in file Init.s
+Comment: Board_Init used once
+Board_Input 00000094
+
+Symbol: Board_Input
+   Definitions
+      At line 123 in file Init.s
+   Uses
+      At line 29 in file Init.s
+Comment: Board_Input used once
+LED_Init 0000005C
+
+Symbol: LED_Init
+   Definitions
+      At line 87 in file Init.s
+   Uses
+      At line 28 in file Init.s
+Comment: LED_Init used once
+4 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Absolute symbols
+
+BLUE 00000004
+
+Symbol: BLUE
+   Definitions
+      At line 19 in file Init.s
+   Uses
+      At line 91 in file Init.s
+      At line 96 in file Init.s
+      At line 101 in file Init.s
+
+GPIO_LOCK_KEY 4C4F434B
+
+Symbol: GPIO_LOCK_KEY
+   Definitions
+      At line 11 in file Init.s
+   Uses
+      At line 49 in file Init.s
+Comment: GPIO_LOCK_KEY used once
+GPIO_PORTF_AFSEL_R 40025420
+
+Symbol: GPIO_PORTF_AFSEL_R
+   Definitions
+      At line 4 in file Init.s
+   Uses
+      At line 61 in file Init.s
+      At line 94 in file Init.s
+
+GPIO_PORTF_AMSEL_R 40025528
+
+Symbol: GPIO_PORTF_AMSEL_R
+   Definitions
+      At line 9 in file Init.s
+   Uses
+      At line 83 in file Init.s
+      At line 110 in file Init.s
+
+GPIO_PORTF_CR_R 40025524
+
+Symbol: GPIO_PORTF_CR_R
+   Definitions
+      At line 8 in file Init.s
+   Uses
+      At line 52 in file Init.s
+Comment: GPIO_PORTF_CR_R used once
+GPIO_PORTF_DEN_R 4002551C
+
+Symbol: GPIO_PORTF_DEN_R
+   Definitions
+      At line 6 in file Init.s
+   Uses
+      At line 72 in file Init.s
+      At line 99 in file Init.s
+
+GPIO_PORTF_DIR_R 40025400
+
+Symbol: GPIO_PORTF_DIR_R
+   Definitions
+      At line 3 in file Init.s
+   Uses
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Absolute symbols
+
+      At line 56 in file Init.s
+      At line 89 in file Init.s
+
+GPIO_PORTF_LOCK_R 40025520
+
+Symbol: GPIO_PORTF_LOCK_R
+   Definitions
+      At line 7 in file Init.s
+   Uses
+      At line 48 in file Init.s
+Comment: GPIO_PORTF_LOCK_R used once
+GPIO_PORTF_PCTL_R 4002552C
+
+Symbol: GPIO_PORTF_PCTL_R
+   Definitions
+      At line 10 in file Init.s
+   Uses
+      At line 77 in file Init.s
+      At line 104 in file Init.s
+
+GPIO_PORTF_PUR_R 40025510
+
+Symbol: GPIO_PORTF_PUR_R
+   Definitions
+      At line 5 in file Init.s
+   Uses
+      At line 67 in file Init.s
+Comment: GPIO_PORTF_PUR_R used once
+GREEN 00000008
+
+Symbol: GREEN
+   Definitions
+      At line 20 in file Init.s
+   Uses
+      At line 91 in file Init.s
+      At line 96 in file Init.s
+      At line 101 in file Init.s
+
+LEDS 40025038
+
+Symbol: LEDS
+   Definitions
+      At line 21 in file Init.s
+   Uses
+      At line 113 in file Init.s
+Comment: LEDS used once
+PF0 40025004
+
+Symbol: PF0
+   Definitions
+      At line 12 in file Init.s
+   Uses
+      None
+Comment: PF0 unused
+PF4 40025040
+
+Symbol: PF4
+   Definitions
+      At line 13 in file Init.s
+
+
+
+ARM Macro Assembler    Page 3 Alphabetic symbol ordering
+Absolute symbols
+
+   Uses
+      None
+Comment: PF4 unused
+RED 00000002
+
+Symbol: RED
+   Definitions
+      At line 18 in file Init.s
+   Uses
+      At line 91 in file Init.s
+      At line 96 in file Init.s
+      At line 101 in file Init.s
+
+SW1 00000010
+
+Symbol: SW1
+   Definitions
+      At line 15 in file Init.s
+   Uses
+      At line 58 in file Init.s
+      At line 63 in file Init.s
+      At line 69 in file Init.s
+      At line 74 in file Init.s
+
+SW2 00000001
+
+Symbol: SW2
+   Definitions
+      At line 16 in file Init.s
+   Uses
+      At line 58 in file Init.s
+      At line 63 in file Init.s
+      At line 69 in file Init.s
+      At line 74 in file Init.s
+
+SWITCHES 40025044
+
+Symbol: SWITCHES
+   Definitions
+      At line 14 in file Init.s
+   Uses
+      At line 124 in file Init.s
+Comment: SWITCHES used once
+SYSCTL_RCGC2_GPIOF 00000020
+
+Symbol: SYSCTL_RCGC2_GPIOF
+   Definitions
+      At line 23 in file Init.s
+   Uses
+      At line 43 in file Init.s
+Comment: SYSCTL_RCGC2_GPIOF used once
+SYSCTL_RCGCGPIO_R 400FE608
+
+Symbol: SYSCTL_RCGCGPIO_R
+   Definitions
+      At line 22 in file Init.s
+   Uses
+      At line 41 in file Init.s
+Comment: SYSCTL_RCGCGPIO_R used once
+
+
+
+ARM Macro Assembler    Page 4 Alphabetic symbol ordering
+Absolute symbols
+
+20 symbols
+357 symbols in table

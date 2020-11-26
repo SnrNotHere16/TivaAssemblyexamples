@@ -1,0 +1,477 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000         ; Switch.s
+    2 00000000         ; Runs on LM4F120/TM4C123
+    3 00000000         ; Provide functions that initialize a GPIO as an input p
+                       in and
+    4 00000000         ; allow reading of a positive logic switch.
+    5 00000000         ; Use bit-banded I/O.
+    6 00000000         ; Daniel and Jonathan Valvano
+    7 00000000         ; September 12, 2013
+    8 00000000         
+    9 00000000         ; This example accompanies the book
+   10 00000000         ;  "Embedded Systems: Introduction to Arm Cortex M Micro
+                       controllers"
+   11 00000000         ;  ISBN: 978-1469998749, Jonathan Valvano, copyright (c)
+                        2013
+   12 00000000         ;  Section 4.2.2, Program 4.2, Figure 4.9
+   13 00000000         
+   14 00000000         ;Copyright 2013 by Jonathan W. Valvano, valvano@mail.ute
+                       xas.edu
+   15 00000000         ;   You may use, edit, run or distribute this file
+   16 00000000         ;   as long as the above copyright notice remains
+   17 00000000         ;THIS SOFTWARE IS PROVIDED "AS IS".  NO WARRANTIES, WHET
+                       HER EXPRESS, IMPLIED
+   18 00000000         ;OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED WA
+                       RRANTIES OF
+   19 00000000         ;MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE AP
+                       PLY TO THIS SOFTWARE.
+   20 00000000         ;VALVANO SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR 
+                       SPECIAL, INCIDENTAL,
+   21 00000000         ;OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
+   22 00000000         ;For more information about my classes, my research, and
+                        my books, see
+   23 00000000         ;http://users.ece.utexas.edu/~valvano/
+   24 00000000         
+   25 00000000         ; negative logic switches connected to PF0 and PF4 on th
+                       e Launchpad
+   26 00000000         ; red LED connected to PF1 on the Launchpad
+   27 00000000         ; blue LED connected to PF2 on the Launchpad
+   28 00000000         ; green LED connected to PF3 on the Launchpad
+   29 00000000         ; NOTE: The NMI (non-maskable interrupt) is on PF0.  Tha
+                       t means that
+   30 00000000         ; the Alternate Function Select, Pull-Up Resistor, Pull-
+                       Down Resistor,
+   31 00000000         ; and Digital Enable are all locked for PF0 until a valu
+                       e of 0x4C4F434B
+   32 00000000         ; is written to the Port F GPIO Lock Register.  After Po
+                       rt F is
+   33 00000000         ; unlocked, bit 0 of the Port F GPIO Commit Register mus
+                       t be set to
+   34 00000000         ; allow access to PF0's control registers.  On the LM4F1
+                       20, the other
+   35 00000000         ; bits of the Port F GPIO Commit Register are hard-wired
+                        to 1, meaning
+   36 00000000         ; that the rest of Port F can always be freely re-config
+                       ured at any
+   37 00000000         ; time.  Requiring this procedure makes it unlikely to a
+                       ccidentally
+   38 00000000         ; re-configure the JTAG and NMI pins as GPIO, which can 
+                       lock the
+   39 00000000         ; debugger out of the processor and make it permanently 
+
+
+
+ARM Macro Assembler    Page 2 
+
+
+                       unable to be
+   40 00000000         ; debugged or re-programmed.
+   41 00000000         
+   42 00000000 40025400 
+                       GPIO_PORTF_DIR_R
+                               EQU              0x40025400
+   43 00000000 40025420 
+                       GPIO_PORTF_AFSEL_R
+                               EQU              0x40025420
+   44 00000000 40025510 
+                       GPIO_PORTF_PUR_R
+                               EQU              0x40025510
+   45 00000000 4002551C 
+                       GPIO_PORTF_DEN_R
+                               EQU              0x4002551C
+   46 00000000 40025520 
+                       GPIO_PORTF_LOCK_R
+                               EQU              0x40025520
+   47 00000000 40025524 
+                       GPIO_PORTF_CR_R
+                               EQU              0x40025524
+   48 00000000 40025528 
+                       GPIO_PORTF_AMSEL_R
+                               EQU              0x40025528
+   49 00000000 4002552C 
+                       GPIO_PORTF_PCTL_R
+                               EQU              0x4002552C
+   50 00000000 4C4F434B 
+                       GPIO_LOCK_KEY
+                               EQU              0x4C4F434B  ; Unlocks the GPIO_
+                                                            CR register
+   51 00000000 40025004 
+                       PF0     EQU              0x40025004
+   52 00000000 40025040 
+                       PF4     EQU              0x40025040
+   53 00000000 40004080 
+                       PA5     EQU              0x40004080
+   54 00000000 40025044 
+                       SWITCHES
+                               EQU              0x40025044
+   55 00000000 00000010 
+                       SW1     EQU              0x10        ; on the left side 
+                                                            of the Launchpad bo
+                                                            ard
+   56 00000000 00000001 
+                       SW2     EQU              0x01        ; on the right side
+                                                             of the Launchpad b
+                                                            oard
+   57 00000000 400FE608 
+                       SYSCTL_RCGCGPIO_R
+                               EQU              0x400FE608
+   58 00000000 00000020 
+                       SYSCTL_RCGC2_GPIOF
+                               EQU              0x00000020  ; port F Clock Gati
+                                                            ng Control
+   59 00000000         
+   60 00000000                 AREA             |.text|, CODE, READONLY, ALIGN=
+2
+   61 00000000                 THUMB
+
+
+
+ARM Macro Assembler    Page 3 
+
+
+   62 00000000                 EXPORT           Board_Init
+   63 00000000                 EXPORT           Board_Input
+   64 00000000         
+   65 00000000         ;------------Board_Init------------
+   66 00000000         ; Initialize GPIO Port F for negative logic switches on 
+                       PF0 and
+   67 00000000         ; PF4 as the Launchpad is wired.  Weak internal pull-up
+   68 00000000         ; resistors are enabled, and the NMI functionality on PF
+                       0 is
+   69 00000000         ; disabled.
+   70 00000000         ; Input: none
+   71 00000000         ; Output: none
+   72 00000000         ; Modifies: R0, R1
+   73 00000000         Board_Init
+   74 00000000         ; activate clock for Port F
+   75 00000000 4918            LDR              R1, =SYSCTL_RCGCGPIO_R ; R1 = &
+                                                            SYSCTL_RCGCGPIO_R
+   76 00000002 6808            LDR              R0, [R1]    ; R0 = [R1]
+   77 00000004 F040 0020       ORR              R0, R0, #SYSCTL_RCGC2_GPIOF ; R
+                                                            0 = R0|SYSCTL_RCGC2
+                                                            _GPIOF
+   78 00000008 6008            STR              R0, [R1]    ; [R1] = R0
+   79 0000000A BF00            NOP
+   80 0000000C BF00            NOP                          ; allow time to fin
+                                                            ish activating
+   81 0000000E         ; unlock the lock register
+   82 0000000E 4916            LDR              R1, =GPIO_PORTF_LOCK_R ; R1 = &
+                                                            GPIO_PORTF_LOCK_R
+   83 00000010 4816            LDR              R0, =GPIO_LOCK_KEY ; R0 = GPIO_
+                                                            LOCK_KEY (unlock GP
+                                                            IO Port F Commit Re
+                                                            gister)
+   84 00000012 6008            STR              R0, [R1]    ; [R1] = R0 = 0x4C4
+                                                            F434B
+   85 00000014         ; set commit register
+   86 00000014 4916            LDR              R1, =GPIO_PORTF_CR_R ; R1 = &GP
+                                                            IO_PORTF_CR_R
+   87 00000016 F04F 00FF       MOV              R0, #0xFF   ; R0 = 0x01 (enable
+                                                             commit for PF0)
+   88 0000001A 6008            STR              R0, [R1]    ; [R1] = R0 = 0x1
+   89 0000001C         ; set direction register
+   90 0000001C 4915            LDR              R1, =GPIO_PORTF_DIR_R ; R1 = &G
+                                                            PIO_PORTF_DIR_R
+   91 0000001E 6808            LDR              R0, [R1]    ; R0 = [R1]
+   92 00000020 F020 0011       BIC              R0, R0, #(SW1+SW2) ; R0 = R0&~(
+                                                            SW1|SW2) (make PF0 
+                                                            and PF4 input; PF0 
+                                                            and PF4 built-in bu
+                                                            ttons)
+   93 00000024 6008            STR              R0, [R1]    ; [R1] = R0
+   94 00000026         ; regular port function
+   95 00000026 4914            LDR              R1, =GPIO_PORTF_AFSEL_R ; R1 = 
+                                                            &GPIO_PORTF_AFSEL_R
+                                                            
+   96 00000028 6808            LDR              R0, [R1]    ; R0 = [R1]
+   97 0000002A F020 0011       BIC              R0, R0, #(SW1+SW2) ; R0 = R0&~(
+                                                            SW1|SW2) (disable a
+                                                            lt funct on PF0 and
+                                                             PF4)
+
+
+
+ARM Macro Assembler    Page 4 
+
+
+   98 0000002E 6008            STR              R0, [R1]    ; [R1] = R0
+   99 00000030         ; put a delay here if you are seeing erroneous NMI
+  100 00000030         ; enable pull-up resistors
+  101 00000030 4912            LDR              R1, =GPIO_PORTF_PUR_R ; R1 = &G
+                                                            PIO_PORTF_PUR_R
+  102 00000032 6808            LDR              R0, [R1]    ; R0 = [R1]
+  103 00000034 F040 0011       ORR              R0, R0, #(SW1+SW2) ; R0 = R0|(S
+                                                            W1|SW2) (enable wea
+                                                            k pull-up on PF0 an
+                                                            d PF4)
+  104 00000038 6008            STR              R0, [R1]    ; [R1] = R0
+  105 0000003A         ; enable digital port
+  106 0000003A 4911            LDR              R1, =GPIO_PORTF_DEN_R ; R1 = &G
+                                                            PIO_PORTF_DEN_R
+  107 0000003C 6808            LDR              R0, [R1]    ; R0 = [R1]
+  108 0000003E F040 0011       ORR              R0, R0, #(SW1+SW2) ; R0 = R0|(S
+                                                            W1|SW2) (enable dig
+                                                            ital I/O on PF0 and
+                                                             PF4)
+  109 00000042 6008            STR              R0, [R1]    ; [R1] = R0
+  110 00000044         ; configure as GPIO
+  111 00000044 490F            LDR              R1, =GPIO_PORTF_PCTL_R ; R1 = &
+                                                            GPIO_PORTF_PCTL_R
+  112 00000046 6808            LDR              R0, [R1]    ; R0 = [R1]
+  113 00000048 F020 100F       BIC              R0, R0, #0x000F000F ; R0 = R0&~
+                                                            0x000F000F (clear p
+                                                            ort control field f
+                                                            or PF0 and PF4)
+  114 0000004C F100 0000       ADD              R0, R0, #0x00000000 ; R0 = R0+0
+                                                            x00000000 (configur
+                                                            e PF0 and PF4 as GP
+                                                            IO)
+  115 00000050 6008            STR              R0, [R1]    ; [R1] = R0
+  116 00000052         ; disable analog functionality
+  117 00000052 490D            LDR              R1, =GPIO_PORTF_AMSEL_R ; R1 = 
+                                                            &GPIO_PORTF_AMSEL_R
+                                                            
+  118 00000054 F04F 0000       MOV              R0, #0      ; R0 = 0 (disable a
+                                                            nalog functionality
+                                                             on PF)
+  119 00000058 6008            STR              R0, [R1]    ; [R1] = R0
+  120 0000005A 4770            BX               LR          ; return
+  121 0000005C         
+  122 0000005C         ;------------Board_Input------------
+  123 0000005C         ; Read and return the status of the switches.
+  124 0000005C         ; Input: none
+  125 0000005C         ; Output: R0  0x01 if only Switch 1 is pressed
+  126 0000005C         ;         R0  0x10 if only Switch 2 is pressed
+  127 0000005C         ;         R0  0x00 if both switches are pressed
+  128 0000005C         ;         R0  0x11 if no switches are pressed
+  129 0000005C         ; Modifies: R1
+  130 0000005C         Board_Input
+  131 0000005C 490B            LDR              R1, =SWITCHES ; R1 = &SWITCHES 
+                                                            (pointer to locatio
+                                                            n of PF0 and PF4)
+  132 0000005E 6808            LDR              R0, [R1]    ; R0 = [R1] (read P
+                                                            F0 and PF4)
+  133 00000060 4770            BX               LR          ; return
+  134 00000062         
+
+
+
+ARM Macro Assembler    Page 5 
+
+
+  135 00000062 00 00           ALIGN                        ; make sure the end
+                                                             of this section is
+                                                             aligned
+  136 00000064                 END                          ; end of file
+              400FE608 
+              40025520 
+              4C4F434B 
+              40025524 
+              40025400 
+              40025420 
+              40025510 
+              4002551C 
+              4002552C 
+              40025528 
+              40025044 
+Command Line: --debug --xref --cpu=Cortex-M4 --apcs=interwork --depend=.\switch
+.d -o.\switch.o -IC:\Keil\ARM\RV31\INC -IC:\Keil\ARM\CMSIS\Include -IC:\Keil\AR
+M\Inc\TI\TM4C123 --predefine="__EVAL SETA 1" --list=.\switch.lst Switch.s
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+.text 00000000
+
+Symbol: .text
+   Definitions
+      At line 60 in file Switch.s
+   Uses
+      None
+Comment: .text unused
+Board_Init 00000000
+
+Symbol: Board_Init
+   Definitions
+      At line 73 in file Switch.s
+   Uses
+      At line 62 in file Switch.s
+Comment: Board_Init used once
+Board_Input 0000005C
+
+Symbol: Board_Input
+   Definitions
+      At line 130 in file Switch.s
+   Uses
+      At line 63 in file Switch.s
+Comment: Board_Input used once
+3 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Absolute symbols
+
+GPIO_LOCK_KEY 4C4F434B
+
+Symbol: GPIO_LOCK_KEY
+   Definitions
+      At line 50 in file Switch.s
+   Uses
+      At line 83 in file Switch.s
+Comment: GPIO_LOCK_KEY used once
+GPIO_PORTF_AFSEL_R 40025420
+
+Symbol: GPIO_PORTF_AFSEL_R
+   Definitions
+      At line 43 in file Switch.s
+   Uses
+      At line 95 in file Switch.s
+Comment: GPIO_PORTF_AFSEL_R used once
+GPIO_PORTF_AMSEL_R 40025528
+
+Symbol: GPIO_PORTF_AMSEL_R
+   Definitions
+      At line 48 in file Switch.s
+   Uses
+      At line 117 in file Switch.s
+Comment: GPIO_PORTF_AMSEL_R used once
+GPIO_PORTF_CR_R 40025524
+
+Symbol: GPIO_PORTF_CR_R
+   Definitions
+      At line 47 in file Switch.s
+   Uses
+      At line 86 in file Switch.s
+Comment: GPIO_PORTF_CR_R used once
+GPIO_PORTF_DEN_R 4002551C
+
+Symbol: GPIO_PORTF_DEN_R
+   Definitions
+      At line 45 in file Switch.s
+   Uses
+      At line 106 in file Switch.s
+Comment: GPIO_PORTF_DEN_R used once
+GPIO_PORTF_DIR_R 40025400
+
+Symbol: GPIO_PORTF_DIR_R
+   Definitions
+      At line 42 in file Switch.s
+   Uses
+      At line 90 in file Switch.s
+Comment: GPIO_PORTF_DIR_R used once
+GPIO_PORTF_LOCK_R 40025520
+
+Symbol: GPIO_PORTF_LOCK_R
+   Definitions
+      At line 46 in file Switch.s
+   Uses
+      At line 82 in file Switch.s
+Comment: GPIO_PORTF_LOCK_R used once
+GPIO_PORTF_PCTL_R 4002552C
+
+Symbol: GPIO_PORTF_PCTL_R
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Absolute symbols
+
+   Definitions
+      At line 49 in file Switch.s
+   Uses
+      At line 111 in file Switch.s
+Comment: GPIO_PORTF_PCTL_R used once
+GPIO_PORTF_PUR_R 40025510
+
+Symbol: GPIO_PORTF_PUR_R
+   Definitions
+      At line 44 in file Switch.s
+   Uses
+      At line 101 in file Switch.s
+Comment: GPIO_PORTF_PUR_R used once
+PA5 40004080
+
+Symbol: PA5
+   Definitions
+      At line 53 in file Switch.s
+   Uses
+      None
+Comment: PA5 unused
+PF0 40025004
+
+Symbol: PF0
+   Definitions
+      At line 51 in file Switch.s
+   Uses
+      None
+Comment: PF0 unused
+PF4 40025040
+
+Symbol: PF4
+   Definitions
+      At line 52 in file Switch.s
+   Uses
+      None
+Comment: PF4 unused
+SW1 00000010
+
+Symbol: SW1
+   Definitions
+      At line 55 in file Switch.s
+   Uses
+      At line 92 in file Switch.s
+      At line 97 in file Switch.s
+      At line 103 in file Switch.s
+      At line 108 in file Switch.s
+
+SW2 00000001
+
+Symbol: SW2
+   Definitions
+      At line 56 in file Switch.s
+   Uses
+      At line 92 in file Switch.s
+      At line 97 in file Switch.s
+      At line 103 in file Switch.s
+      At line 108 in file Switch.s
+
+
+
+
+ARM Macro Assembler    Page 3 Alphabetic symbol ordering
+Absolute symbols
+
+SWITCHES 40025044
+
+Symbol: SWITCHES
+   Definitions
+      At line 54 in file Switch.s
+   Uses
+      At line 131 in file Switch.s
+Comment: SWITCHES used once
+SYSCTL_RCGC2_GPIOF 00000020
+
+Symbol: SYSCTL_RCGC2_GPIOF
+   Definitions
+      At line 58 in file Switch.s
+   Uses
+      At line 77 in file Switch.s
+Comment: SYSCTL_RCGC2_GPIOF used once
+SYSCTL_RCGCGPIO_R 400FE608
+
+Symbol: SYSCTL_RCGCGPIO_R
+   Definitions
+      At line 57 in file Switch.s
+   Uses
+      At line 75 in file Switch.s
+Comment: SYSCTL_RCGCGPIO_R used once
+17 symbols
+353 symbols in table

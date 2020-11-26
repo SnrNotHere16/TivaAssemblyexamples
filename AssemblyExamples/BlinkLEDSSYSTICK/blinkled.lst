@@ -1,0 +1,411 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000         ;Makes an LED toggle with a 1 second delay. 
+    2 00000000         ;switches make the LED color change from R->B->G
+    3 00000000         ;Mode 1 RED LED 
+    4 00000000         ;Mode 2 BLUE LED 
+    5 00000000         ;Mode 3 GREEN LED 
+    6 00000000         ;MODE 4 R->B->G
+    7 00000000         ;SW1 switches the LED
+    8 00000000                 IMPORT           Board_Init
+    9 00000000                 IMPORT           LED_Init
+   10 00000000                 IMPORT           Board_Input
+   11 00000000 40025400 
+                       GPIO_PORTF_DIR_R
+                               EQU              0x40025400
+   12 00000000 40025420 
+                       GPIO_PORTF_AFSEL_R
+                               EQU              0x40025420
+   13 00000000 4002551C 
+                       GPIO_PORTF_DEN_R
+                               EQU              0x4002551C
+   14 00000000 40025528 
+                       GPIO_PORTF_AMSEL_R
+                               EQU              0x40025528
+   15 00000000 4002552C 
+                       GPIO_PORTF_PCTL_R
+                               EQU              0x4002552C
+   16 00000000 40025004 
+                       PF0     EQU              0x40025004
+   17 00000000 40025008 
+                       PF1     EQU              0x40025008
+   18 00000000 40025010 
+                       PF2     EQU              0x40025010
+   19 00000000 40025020 
+                       PF3     EQU              0x40025020
+   20 00000000 40025040 
+                       PF4     EQU              0x40025040
+   21 00000000 40025038 
+                       LEDS    EQU              0x40025038
+   22 00000000 00000002 
+                       RED     EQU              0x02
+   23 00000000 00000004 
+                       BLUE    EQU              0x04
+   24 00000000 00000008 
+                       GREEN   EQU              0x08
+   25 00000000 00000000 
+                       DARK    EQU              0x00
+   26 00000000 40025044 
+                       SWITCHES
+                               EQU              0x40025044
+   27 00000000 00000010 
+                       SW1     EQU              0x10        ; on the left side 
+                                                            of the Launchpad bo
+                                                            ard
+   28 00000000         
+   29 00000000                 AREA             |.text|, CODE, READONLY, ALIGN=
+2
+   30 00000000                 THUMB
+   31 00000000                 EXPORT           Start
+   32 00000000         Start
+   33 00000000         
+
+
+
+ARM Macro Assembler    Page 2 
+
+
+   34 00000000         
+   35 00000000         ;-------------------------------------------------------
+                       ---------
+   36 00000000 F7FF FFFE       BL               Board_Init  ; initialize PF0 an
+                                                            d PF4 and make them
+                                                             inputs
+   37 00000004 F7FF FFFE       BL               LED_Init    ; initialize PF1-PF
+                                                            3 and make them out
+                                                            puts 
+   38 00000008 F04F 0502       MOV              R5, #RED    ; R5 = RED (red LED
+                                                             on)
+   39 0000000C F04F 0604       MOV              R6, #BLUE   ; R6 = BLUE (blue L
+                                                            ED on)
+   40 00000010 F04F 0708       MOV              R7, #GREEN  ; R7 = 0, intialize
+                                                             counter
+   41 00000014 F04F 0900       MOV              R9, #DARK
+   42 00000018 6025            STR              R5,  [R4]
+   43 0000001A         ;Define array
+   44 0000001A         loop
+   45 0000001A F7FF FFFE       BL               Board_Input
+   46 0000001E 2801            CMP              R0, #0x01   ; R0 == 0x01?
+   47 00000020 D004            BEQ              sw1pressed  ; if so, switch 1 p
+                                                            ressed
+   48 00000022 2811            CMP              R0, #0x11   ; R0 == 0x11?
+   49 00000024 D004            BEQ              nopressed   ; if so, neither sw
+                                                            itch pressed
+   50 00000026         ; if none of the above, unexpected return value
+   51 00000026 F8C4 9000       STR              R9, [R4]    ; [R4] = R9 = (RED|
+                                                            GREEN|BLUE) (all LE
+                                                            Ds on)
+   52 0000002A E7F6            B                loop
+   53 0000002C         sw1pressed
+   54 0000002C 6026            STR              R6, [R4]    ; [R4] = R6 = BLUE 
+                                                            (blue LED on)
+   55 0000002E E7F4            B                loop
+   56 00000030         nopressed
+   57 00000030         
+   58 00000030 E7F3            B                loop
+   59 00000032         
+   60 00000032         
+   61 00000032         ;performs a delay of n ms. 
+   62 00000032         ;n is the value of R3
+   63 00000032         ; n = 48
+   64 00000032         ;from TI TIVA ARM PROGRAMMING FOR EMBEDDED SYSTEMS
+   65 00000032         delayMS
+   66 00000032 F04F 0330       MOV              R3, #0x30   ;R3 = 0x05
+   67 00000036 2B00            CMP              R3, #0x00
+   68 00000038 D1FF            BNE              L1          ;if n = 0, return 
+   69 0000003A         ; B bothpressedfin
+   70 0000003A F241 4AD8 
+                       L1      LDR              R10, =5336
+   71 0000003E         ; do inner loop 5336 times (for 16 MHz CPU clock)
+   72 0000003E F1BA 0A01 
+                       L2      SUBS             R10, R10, #1 ;inner loop
+   73 00000042 D1FC            BNE              L2
+   74 00000044 1E5B            SUBS             R3, R3, #1  ;do outer loop
+   75 00000046 D1F8            BNE              L1
+   76 00000048         ; B bothpressedfin       ;return
+   77 00000048         
+
+
+
+ARM Macro Assembler    Page 3 
+
+
+   78 00000048                 ALIGN                        ; make sure the end
+                                                             of this section is
+                                                             aligned
+   79 00000048                 END                          ; end of file
+Command Line: --debug --xref --cpu=Cortex-M4 --apcs=interwork --depend=.\blinkl
+ed.d -o.\blinkled.o -IC:\Keil\ARM\RV31\INC -IC:\Keil\ARM\CMSIS\Include -IC:\Kei
+l\ARM\Inc\TI\TM4C123 --predefine="__EVAL SETA 1" --list=.\blinkled.lst BlinkLED
+.s
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+.text 00000000
+
+Symbol: .text
+   Definitions
+      At line 29 in file BlinkLED.s
+   Uses
+      None
+Comment: .text unused
+L1 0000003A
+
+Symbol: L1
+   Definitions
+      At line 70 in file BlinkLED.s
+   Uses
+      At line 68 in file BlinkLED.s
+      At line 75 in file BlinkLED.s
+
+L2 0000003E
+
+Symbol: L2
+   Definitions
+      At line 72 in file BlinkLED.s
+   Uses
+      At line 73 in file BlinkLED.s
+Comment: L2 used once
+Start 00000000
+
+Symbol: Start
+   Definitions
+      At line 32 in file BlinkLED.s
+   Uses
+      At line 31 in file BlinkLED.s
+Comment: Start used once
+delayMS 00000032
+
+Symbol: delayMS
+   Definitions
+      At line 65 in file BlinkLED.s
+   Uses
+      None
+Comment: delayMS unused
+loop 0000001A
+
+Symbol: loop
+   Definitions
+      At line 44 in file BlinkLED.s
+   Uses
+      At line 52 in file BlinkLED.s
+      At line 55 in file BlinkLED.s
+      At line 58 in file BlinkLED.s
+
+nopressed 00000030
+
+Symbol: nopressed
+   Definitions
+      At line 56 in file BlinkLED.s
+   Uses
+      At line 49 in file BlinkLED.s
+Comment: nopressed used once
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Relocatable symbols
+
+sw1pressed 0000002C
+
+Symbol: sw1pressed
+   Definitions
+      At line 53 in file BlinkLED.s
+   Uses
+      At line 47 in file BlinkLED.s
+Comment: sw1pressed used once
+8 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Absolute symbols
+
+BLUE 00000004
+
+Symbol: BLUE
+   Definitions
+      At line 23 in file BlinkLED.s
+   Uses
+      At line 39 in file BlinkLED.s
+Comment: BLUE used once
+DARK 00000000
+
+Symbol: DARK
+   Definitions
+      At line 25 in file BlinkLED.s
+   Uses
+      At line 41 in file BlinkLED.s
+Comment: DARK used once
+GPIO_PORTF_AFSEL_R 40025420
+
+Symbol: GPIO_PORTF_AFSEL_R
+   Definitions
+      At line 12 in file BlinkLED.s
+   Uses
+      None
+Comment: GPIO_PORTF_AFSEL_R unused
+GPIO_PORTF_AMSEL_R 40025528
+
+Symbol: GPIO_PORTF_AMSEL_R
+   Definitions
+      At line 14 in file BlinkLED.s
+   Uses
+      None
+Comment: GPIO_PORTF_AMSEL_R unused
+GPIO_PORTF_DEN_R 4002551C
+
+Symbol: GPIO_PORTF_DEN_R
+   Definitions
+      At line 13 in file BlinkLED.s
+   Uses
+      None
+Comment: GPIO_PORTF_DEN_R unused
+GPIO_PORTF_DIR_R 40025400
+
+Symbol: GPIO_PORTF_DIR_R
+   Definitions
+      At line 11 in file BlinkLED.s
+   Uses
+      None
+Comment: GPIO_PORTF_DIR_R unused
+GPIO_PORTF_PCTL_R 4002552C
+
+Symbol: GPIO_PORTF_PCTL_R
+   Definitions
+      At line 15 in file BlinkLED.s
+   Uses
+      None
+Comment: GPIO_PORTF_PCTL_R unused
+GREEN 00000008
+
+Symbol: GREEN
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Absolute symbols
+
+   Definitions
+      At line 24 in file BlinkLED.s
+   Uses
+      At line 40 in file BlinkLED.s
+Comment: GREEN used once
+LEDS 40025038
+
+Symbol: LEDS
+   Definitions
+      At line 21 in file BlinkLED.s
+   Uses
+      None
+Comment: LEDS unused
+PF0 40025004
+
+Symbol: PF0
+   Definitions
+      At line 16 in file BlinkLED.s
+   Uses
+      None
+Comment: PF0 unused
+PF1 40025008
+
+Symbol: PF1
+   Definitions
+      At line 17 in file BlinkLED.s
+   Uses
+      None
+Comment: PF1 unused
+PF2 40025010
+
+Symbol: PF2
+   Definitions
+      At line 18 in file BlinkLED.s
+   Uses
+      None
+Comment: PF2 unused
+PF3 40025020
+
+Symbol: PF3
+   Definitions
+      At line 19 in file BlinkLED.s
+   Uses
+      None
+Comment: PF3 unused
+PF4 40025040
+
+Symbol: PF4
+   Definitions
+      At line 20 in file BlinkLED.s
+   Uses
+      None
+Comment: PF4 unused
+RED 00000002
+
+Symbol: RED
+   Definitions
+      At line 22 in file BlinkLED.s
+   Uses
+
+
+
+ARM Macro Assembler    Page 3 Alphabetic symbol ordering
+Absolute symbols
+
+      At line 38 in file BlinkLED.s
+Comment: RED used once
+SW1 00000010
+
+Symbol: SW1
+   Definitions
+      At line 27 in file BlinkLED.s
+   Uses
+      None
+Comment: SW1 unused
+SWITCHES 40025044
+
+Symbol: SWITCHES
+   Definitions
+      At line 26 in file BlinkLED.s
+   Uses
+      None
+Comment: SWITCHES unused
+17 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+External symbols
+
+Board_Init 00000000
+
+Symbol: Board_Init
+   Definitions
+      At line 8 in file BlinkLED.s
+   Uses
+      At line 36 in file BlinkLED.s
+Comment: Board_Init used once
+Board_Input 00000000
+
+Symbol: Board_Input
+   Definitions
+      At line 10 in file BlinkLED.s
+   Uses
+      At line 45 in file BlinkLED.s
+Comment: Board_Input used once
+LED_Init 00000000
+
+Symbol: LED_Init
+   Definitions
+      At line 9 in file BlinkLED.s
+   Uses
+      At line 37 in file BlinkLED.s
+Comment: LED_Init used once
+3 symbols
+359 symbols in table

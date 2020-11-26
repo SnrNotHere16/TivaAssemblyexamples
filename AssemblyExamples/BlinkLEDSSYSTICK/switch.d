@@ -1,0 +1,1 @@
+.\switch.o: Switch.s
