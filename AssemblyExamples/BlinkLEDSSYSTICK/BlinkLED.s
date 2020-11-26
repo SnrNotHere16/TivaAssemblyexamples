@@ -71,7 +71,8 @@ nopressed
 	STR R5, [R4]
 	B loop
 mode1 ;mode 1 LED color red 
-	LSR R5, R5, #2     ;Shift right R5 by two (assume to be 0x08)
+	MOV R7,#0x00	 ;Reset counter of RBG mode 4
+	MOV R5, #RED     ;R5 = RED (0x02)
 	STR R5, [R4]	;[R4] = R5 = RED (RED LED on)
 	B sw1pressed2
 mode2 ;mode 2 LED color blue
@@ -83,7 +84,9 @@ mode3 ;mode 3 LED color green
 	STR R5, [R4]
 	B sw1pressed2
 mode4 ;mode 4 LED color cycle 
- 	mov R5,#GREEN
+ 	MOV R5, #RED  ;Shift R5 right by two (assume to be 0x08 before)
+	STR R5, [R4]    ;[R4] = R5 = RED (RED LED on)
+	MOV R7,#0x00          ;the counter for the cycle, RBG,
 	B sw1pressed2
 
 ;performs a delay of n ms. 
