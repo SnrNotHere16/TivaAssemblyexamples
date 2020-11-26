@@ -35,45 +35,67 @@ Start
 ;----------------------------------------------------------------
     BL  Board_Init                  ; initialize PF0 and PF4 and make them inputs
 	BL  LED_Init					; initialize PF1-PF3 and make them outputs 
-    MOV R5, #RED                    ; R5 = RED (red LED on)
-    MOV R6, #BLUE                   ; R6 = BLUE (blue LED on)
-    MOV R7, #GREEN                 	; R7 = 0, intialize counter
-	MOV R9, #DARK
+    MOV R5, #RED                    ; R5 = RED (red LED on) the color of the LED register
+	MOV R2, #0 						; R2 = 0, R2 is the in charge of monitoring the mode
 	STR R5,  [R4]
 ;Define array
 loop
     BL  Board_Input
     CMP R0, #0x01                   ; R0 == 0x01?
-    BEQ sw1pressed                  ; if so, switch 1 pressed
+    BEQ sw1pressed1                  ; if so, switch 1 pressed
     CMP R0, #0x11                   ; R0 == 0x11?
     BEQ nopressed                   ; if so, neither switch pressed
                                     ; if none of the above, unexpected return value
     STR R9, [R4]                    ; [R4] = R9 = (RED|GREEN|BLUE) (all LEDs on)
     B   loop
-sw1pressed
-    STR R6, [R4]                    ; [R4] = R6 = BLUE (blue LED on)
+sw1pressed1
+    ADD R2, R2, #0x01				;R2 = R2+1
+	AND R2, R2, #0x03				;R2 = R2&&3 = R2%4
+	CMP R2, #0x00
+	BEQ mode1 
+	CMP R2, #0x01
+	BEQ mode2
+	CMP R2, #0x02
+	BEQ mode3
+	CMP R2, #0x03
+	BEQ mode4
+sw1pressed2
+	BL delayMS
     B   loop
 nopressed 
-	
 	B loop
-
+mode1 ;mode 1 LED color red 
+	LSR R5, R5, #2     ;Shift right R5 by two (assume to be 0x08)
+	STR R5, [R4]	;[R4] = R5 = RED (RED LED on)
+	B sw1pressed2
+mode2 ;mode 2 LED color blue
+	LSL R5, R5,#1   ;Shift left R5 by one (assume to be 0x02 before)
+	STR R5, [R4]
+	B sw1pressed2
+mode3 ;mode 3 LED color green 
+	LSL R5, R5,#1   ;Shift left R5 by one (assume to be 0x04 before)
+	STR R5, [R4]
+	B sw1pressed2
+mode4 ;mode 4 LED color cycle 
+ 	mov R5,#GREEN
+	B sw1pressed2
 
 ;performs a delay of n ms. 
 ;n is the value of R3
-; n = 48
+; n = 240
 ;from TI TIVA ARM PROGRAMMING FOR EMBEDDED SYSTEMS
 delayMS
-	MOV R3, #0x30				;R3 = 0x05
+	MOV R3, #0xF0				;R3 = 0xF0
 	CMP R3, #0x00
 	BNE L1							;if n = 0, return 
-;	B bothpressedfin
+	BX LR
 L1  LDR 	R10, =5336
 	; do inner loop 5336 times (for 16 MHz CPU clock)
 L2	SUBS R10, R10, #1				;inner loop
 	BNE L2
 	SUBS R3, R3, #1 				;do outer loop
 	BNE L1
-;	B bothpressedfin							;return
+	BX LR							;return
 	
     ALIGN                           ; make sure the end of this section is aligned
     END                             ; end of file
