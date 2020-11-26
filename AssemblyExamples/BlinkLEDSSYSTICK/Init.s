@@ -1,5 +1,4 @@
 
-
 GPIO_PORTF_DIR_R   EQU 0x40025400
 GPIO_PORTF_AFSEL_R EQU 0x40025420
 GPIO_PORTF_PUR_R   EQU 0x40025510
@@ -18,6 +17,7 @@ SW2       EQU 0x01                 ; on the right side of the Launchpad board
 RED 	  EQU 0x02
 BLUE 	  EQU 0x04
 GREEN 	  EQU 0x08
+DARK 	  EQU 0x00 
 LEDS      EQU 0x40025038
 ;Systick timer 
 NVIC_ST_CTRL_R        EQU 0xE000E010
@@ -220,7 +220,40 @@ toggle3
 	EOR R5, R5, #GREEN
 	B SysTick_Wait10msdone2
 toggle4 
-	EOR R5, R5, R5
+	CMP R7,#0x00
+	BEQ turnred 
+	CMP R7,#0x01
+	BEQ turndark
+	CMP R7, #0x02
+	BEQ turnblue
+	CMP R7, #0x03
+	BEQ turndark
+	CMP R7, #0x04
+	BEQ turngreen
+	CMP R7, #0x05
+	BEQ turndark
+
+turnred 
+	MOV R5, #RED
+	ADD R7, R7, #0x01   ;increment R7 by 1 
+	B SysTick_Wait10msdone2
+turnblue
+	MOV R5, #BLUE 
+	ADD R7, R7, #0x01 ;increment R7 by 1
+	B SysTick_Wait10msdone2
+turngreen 
+	MOV R5, #GREEN 
+	ADD R7, R7, #0x01 ;increment R7 by 1 
+	B SysTick_Wait10msdone2
+turndark 
+	MOV R5, #DARK
+	CMP R7, #0x05
+	BEQ R7Reset         ;reset R7 
+	ADD R7, R7, #0x01 ;increment R7 by 1 
+	B SysTick_Wait10msdone2
+R7Reset 
+	MOV R7, #0x00 
+	B SysTick_Wait10msdone2
     ALIGN                           ; make sure the end of this section is aligned
     END                             ; end of file
 
