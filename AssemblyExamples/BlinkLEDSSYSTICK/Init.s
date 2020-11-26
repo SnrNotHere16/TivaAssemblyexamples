@@ -19,6 +19,15 @@ RED 	  EQU 0x02
 BLUE 	  EQU 0x04
 GREEN 	  EQU 0x08
 LEDS      EQU 0x40025038
+;Systick timer 
+NVIC_ST_CTRL_R        EQU 0xE000E010
+NVIC_ST_RELOAD_R      EQU 0xE000E014
+NVIC_ST_CURRENT_R     EQU 0xE000E018
+NVIC_ST_CTRL_COUNT    EQU 0x00010000  ; Count flag
+NVIC_ST_CTRL_CLK_SRC  EQU 0x00000004  ; Clock Source
+NVIC_ST_CTRL_INTEN    EQU 0x00000002  ; Interrupt enable
+NVIC_ST_CTRL_ENABLE   EQU 0x00000001  ; Counter mode
+NVIC_ST_RELOAD_M      EQU 0x00FFFFFF  ; Counter load value
 SYSCTL_RCGCGPIO_R  EQU 0x400FE608
 SYSCTL_RCGC2_GPIOF EQU 0x00000020  ; port F Clock Gating Control
 
@@ -27,6 +36,9 @@ SYSCTL_RCGC2_GPIOF EQU 0x00000020  ; port F Clock Gating Control
         EXPORT  Board_Init
 		EXPORT  LED_Init
         EXPORT  Board_Input
+		EXPORT   SysTick_Init
+        EXPORT   SysTick_Wait
+        EXPORT   SysTick_Wait10ms
 
 ;------------Board_Init------------
 ; Initialize GPIO Port F for negative logic switches on PF0 and
@@ -125,5 +137,90 @@ Board_Input
     LDR R0, [R1]                    ; R0 = [R1] (read PF0 and PF4)
     BX  LR                          ; return
 
+
+;------------SysTick_Init------------
+; Initialize SysTick with busy wait running at bus clock.
+; Input: none
+; Output: none
+; Modifies: R0, R1
+SysTick_Init
+    ; disable SysTick during setup
+    LDR R1, =NVIC_ST_CTRL_R         ; R1 = &NVIC_ST_CTRL_R
+    MOV R0, #0                      ; R0 = 0
+    STR R0, [R1]                    ; [R1] = R0 = 0
+    ; maximum reload value
+    LDR R1, =NVIC_ST_RELOAD_R       ; R1 = &NVIC_ST_RELOAD_R
+    LDR R0, =NVIC_ST_RELOAD_M;      ; R0 = NVIC_ST_RELOAD_M
+    STR R0, [R1]                    ; [R1] = R0 = NVIC_ST_RELOAD_M
+    ; any write to current clears it
+    LDR R1, =NVIC_ST_CURRENT_R      ; R1 = &NVIC_ST_CURRENT_R
+    MOV R0, #0                      ; R0 = 0
+    STR R0, [R1]                    ; [R1] = R0 = 0
+    ; enable SysTick with core clock
+    LDR R1, =NVIC_ST_CTRL_R         ; R1 = &NVIC_ST_CTRL_R
+                                    ; R0 = ENABLE and CLK_SRC bits set
+    MOV R0, #(NVIC_ST_CTRL_ENABLE+NVIC_ST_CTRL_CLK_SRC)
+    STR R0, [R1]                    ; [R1] = R0 = (NVIC_ST_CTRL_ENABLE|NVIC_ST_CTRL_CLK_SRC)
+    BX  LR                          ; return
+
+;------------SysTick_Wait------------
+; Time delay using busy wait.
+; Input: R0  delay parameter in units of the core clock (units of 8.333 nsec for 120 MHz clock)
+; Output: none
+; Modifies: R1, R2, R3
+SysTick_Wait
+    ; get the starting time (R2)
+    LDR R1, =NVIC_ST_CURRENT_R      ; R1 = &NVIC_ST_CURRENT_R
+    LDR R2, [R1]                    ; R2 = [R1] = startTime
+SysTick_Wait_loop
+    ; determine the elapsed time (R3)
+    LDR R3, [R1]                    ; R3 = [R1] = currentTime
+    SUB R3, R2, R3                  ; R3 = R2 - R3 = startTime - currentTime
+    ; handle possible counter roll over by converting to 24-bit subtraction
+    AND R3, R3, #0x00FFFFFF
+    ; is elapsed time (R3) <= delay (R0)?
+    CMP R3, R0
+    BLS SysTick_Wait_loop
+    BX  LR                          ; return
+
+;------------SysTick_Wait10ms------------
+; Time delay using busy wait.  This assumes 120 MHz clock
+; Input: R0  number of times to wait 10 ms before returning
+; Output: none
+; Modifies: R0
+DELAY10MS             EQU 1200000   ; clock cycles in 10 ms (assumes 120 MHz clock)
+SysTick_Wait10ms
+    PUSH {R4, LR}                   ; save current value of R4 and LR
+    MOVS R4, R0                     ; R4 = R0 = remainingWaits
+    BEQ SysTick_Wait10ms_done       ; R4 == 0, done
+SysTick_Wait10ms_loop
+    LDR R0, =DELAY10MS              ; R0 = DELAY10MS
+    BL  SysTick_Wait                ; wait 10 ms
+    SUBS R4, R4, #1                 ; R4 = R4 - 1; remainingWaits--
+    BHI SysTick_Wait10ms_loop       ; if(R4 > 0), wait another 10 ms
+SysTick_Wait10ms_done
+	CMP R6, #0x00
+	BEQ toggle1
+	CMP R6, #0x01
+	BEQ toggle2
+	CMP R6, #0x02
+	BEQ toggle3
+	CMP R6, #0x03
+	BEQ toggle4
+SysTick_Wait10msdone2
+    POP {R4, LR}                    ; restore previous value of R4 and LR
+    BX  LR                          ; return
+toggle1
+	EOR R5, R5, #RED
+	B SysTick_Wait10msdone2
+toggle2
+	EOR R5, R5, #BLUE
+	B SysTick_Wait10msdone2
+toggle3
+	EOR R5, R5, #GREEN
+	B SysTick_Wait10msdone2
+toggle4 
+	EOR R5, R5, R5
     ALIGN                           ; make sure the end of this section is aligned
     END                             ; end of file
+
